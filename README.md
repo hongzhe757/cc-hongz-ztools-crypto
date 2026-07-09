@@ -1,39 +1,49 @@
-# cc-hongz-ztools-crypto
+# hongz-ztools-crypto
 
-#### 介绍
-{**以下是 Gitee 平台说明，您可以替换此简介**
-Gitee 是 OSCHINA 推出的基于 Git 的代码托管平台（同时支持 SVN）。专为开发者提供稳定、高效、安全的云端软件开发协作平台
-无论是个人、团队、或是企业，都能够用 Gitee 实现代码托管、项目管理、协作开发。企业项目请看 [https://gitee.com/enterprises](https://gitee.com/enterprises)}
+Hongz **密码学工具库**（`jar`），对应 Hutool **`hutool-crypto`**，按需自 `hongz-zthrids/hongz-zthrids-hutool-v5-master/hutool-crypto` 平移/精简。
 
-#### 软件架构
-软件架构说明
+包名 `cc.hongz.ztools.crypto.*`，依赖 [`hongz-ztools-core`](../hongz-ztools-core/)（对应 `hutool-crypto` → `hutool-core`）。
 
+## 模块关系
 
-#### 安装教程
+| Hutool | Hongz |
+|---|---|
+| `hutool-core` | `hongz-ztools-core`（codec、IO、工具） |
+| `hutool-crypto` | **`hongz-ztools-crypto`**（本模块） |
+| `hutool-captcha` | `hongz-ztools-captcha` |
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+**与 codec 的边界**：Base64/Hex 等表示层编码在 `hongz-ztools-core` 的 `cc.hongz.ztools.core.codec`；ASN.1 DER/BER、证书、密钥、加解密在本模块。
 
-#### 使用说明
+## 当前 API
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+| 类 | 说明 |
+|---|---|
+| `ASN1Util` | DER / BER / DL 序列编码、解码、`ASN1Dump` 调试导出 |
+| `CryptoException` | 密码学运行时异常 |
 
-#### 参与贡献
+依赖 **BouncyCastle** `bcpkix-jdk18on`（版本由根 POM `bouncycastle.version` 管理，与 hutool-crypto 对齐为 1.82）。
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+## 同步源码
 
+自 `hongz-zthrids/hongz-zthrids-hutool-v5-master/hutool-crypto/.../cn/hutool/crypto` 同步 ASN.1 相关类：
 
-#### 特技
+```bash
+python scripts/bootstrap-hongz-crypto-asn1.py
+mvn -f hongz-ztools/hongz-ztools-crypto/pom.xml clean test
+```
 
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+## 构建
+
+```bash
+mvn -pl hongz-ztools/hongz-ztools-core,hongz-ztools/hongz-ztools-crypto -am clean test
+```
+
+或单模块：
+
+```bash
+mvn -f hongz-ztools/hongz-ztools-crypto/pom.xml clean test
+```
+
+## 变更记录
+
+详见 [CHANGELOG.md](./CHANGELOG.md)。
