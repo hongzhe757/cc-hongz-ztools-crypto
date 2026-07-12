@@ -20,8 +20,8 @@
     <dependencies>
         <!-- hongz-ztools-core：IO 异常、StrUtil 等最小工具 -->
         <dependency>
-            <groupId>cc.hongz</groupId>
-            <artifactId>hongz-ztools-core</artifactId>
+            <groupId>com.hongz</groupId>
+            <artifactId>cc-hongz-ztools-core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- BouncyCastle PKIX：ASN.1 DER/BER/DL、证书与密钥格式 -->
