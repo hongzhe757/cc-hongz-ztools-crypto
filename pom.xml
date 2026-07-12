@@ -18,7 +18,7 @@
     <description>加密工具模块</description>
 
     <dependencies>
-        <!-- hongz-ztools-core：IO 异常、StrUtil 等最小工具 -->
+        <!-- cc-hongz-ztools-core：IO 异常、StrUtil 等最小工具 -->
         <dependency>
             <groupId>com.hongz</groupId>
             <artifactId>cc-hongz-ztools-core</artifactId>
