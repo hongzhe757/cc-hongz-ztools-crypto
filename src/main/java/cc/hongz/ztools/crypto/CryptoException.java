@@ -3,7 +3,7 @@ package cc.hongz.ztools.crypto;
 import cc.hongz.ztools.core.util.StrUtil;
 
 /**
- * 密码学相关运行时异常（自 Hutool {@code cn.hutool.crypto.CryptoException} 迁入）.
+ * 密码学相关运行时异常。
  *
  * @author Looly
  */
