@@ -17,8 +17,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * ASN.1 – Abstract Syntax Notation dot one，抽象记法 1 工具类。<br>
- * ASN.1 描述了一种对数据进行表示、编码、传输和解码的数据格式。其编码格式包括 DER、BER、DL 等。<br>
+ * ASN.1 – Abstract Syntax Notation dot one，抽象记法 1 工具类。 <br>
+ * ASN.1 描述了一种对数据进行表示、编码、传输和解码的数据格式。其编码格式包括 DER、BER、DL 等。 <br>
  * 依赖 BouncyCastle {@code bcpkix-jdk18on}。
  *
  * @author looly
