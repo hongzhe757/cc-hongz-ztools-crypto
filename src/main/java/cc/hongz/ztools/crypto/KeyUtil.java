@@ -18,8 +18,11 @@ import javax.crypto.spec.DESKeySpec;
 import javax.crypto.spec.DESedeKeySpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.math.BigInteger;
 import java.security.Key;
 import java.security.InvalidAlgorithmParameterException;
@@ -37,6 +40,7 @@ import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.ECGenParameterSpec;
@@ -45,6 +49,20 @@ import java.security.spec.KeySpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Date;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.X500NameBuilder;
+import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 
 /**
  * 密钥工具类。
@@ -84,6 +102,14 @@ public final class KeyUtil {
      * Certification类型：X.509。
      */
     public static final String CERT_TYPE_X509 = "X.509";
+    /**
+     * 默认签名算法：SHA256withRSA。
+     */
+    public static final String SIGN_ALGORITHM_SHA256_WITH_RSA = "SHA256withRSA";
+    /**
+     * 生成随机证书序列号时使用的位数。
+     */
+    private static final int SERIAL_NUMBER_BITS = 128;
 
     /**
      * 默认密钥字节数
@@ -1082,5 +1108,202 @@ public final class KeyUtil {
      */
     public static String toBase64(final Key key) {
         return Base64.encode(key.getEncoded());
+    }
+
+    /**
+     * 生成X500Name，用于证书的颁发者（issuer）与使用者（subject）名称。 <br>
+     * 传入为空白字符串的字段会被跳过，示例：
+     *
+     * <pre>
+     * KeyUtil.generateX500Name("hongz", "Laser", "R&amp;D", "BeiJing", "BeiJing", "CN");
+     * </pre>
+     *
+     * 此处使用通用的{@link BCStyle}，对RDN顺序无强约束；如需与严格CA交互，可自行用
+     * {@link X500NameBuilder}构造。
+     *
+     * @param cn 通用名（Common Name），如域名或人名
+     * @param o  组织名（Organization）
+     * @param ou 组织单位（Organizational Unit）
+     * @param l  城市或地区（Locality）
+     * @param st 省或州（State）
+     * @param c  国家代码（Country），如CN
+     * @return {@link X500Name}
+     * @since 1.0.0
+     */
+    public static X500Name generateX500Name(final String cn, final String o, final String ou, final String l,
+                                            final String st, final String c) {
+        final X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
+        addRdn(builder, BCStyle.CN, cn);
+        addRdn(builder, BCStyle.O, o);
+        addRdn(builder, BCStyle.OU, ou);
+        addRdn(builder, BCStyle.L, l);
+        addRdn(builder, BCStyle.ST, st);
+        addRdn(builder, BCStyle.C, c);
+        return builder.build();
+    }
+
+    /**
+     * 生成随机的证书序列号。
+     *
+     * @return 随机正整数序列号
+     * @since 1.0.0
+     */
+    public static BigInteger generateRandomSerialNumber() {
+        return new BigInteger(SERIAL_NUMBER_BITS, new SecureRandom());
+    }
+
+    /**
+     * 生成自签X.509证书。 <br>
+     * 颁发者与使用者为同一名称，常用于生成根证书。
+     *
+     * @param subject      使用者名称，同时作为颁发者名称
+     * @param privateKey   私钥，用于签名
+     * @param publicKey    公钥，写入证书
+     * @param serialNumber 证书序列号，可通过{@link #generateRandomSerialNumber()}生成
+     * @param notBefore    生效时间
+     * @param notAfter     失效时间
+     * @return {@link X509Certificate}
+     * @since 1.0.0
+     */
+    public static X509Certificate generateSelfSignedX509Certificate(final X500Name subject, final PrivateKey privateKey,
+                                                                    final PublicKey publicKey,
+                                                                    final BigInteger serialNumber,
+                                                                    final Date notBefore, final Date notAfter) {
+        return generateX509Certificate(subject, subject, serialNumber, notBefore, notAfter, privateKey, publicKey);
+    }
+
+    /**
+     * 生成X.509证书，使用默认签名算法{@link #SIGN_ALGORITHM_SHA256_WITH_RSA}。 <br>
+     * 颁发者与使用者名称相同时生成自签证书，否则为由颁发者签发的下级证书。
+     *
+     * @param issuer           颁发者名称
+     * @param subject          使用者名称
+     * @param serialNumber     证书序列号，可通过{@link #generateRandomSerialNumber()}生成
+     * @param notBefore        生效时间
+     * @param notAfter         失效时间
+     * @param issuerPrivateKey 颁发者私钥，用于签名
+     * @param subjectPublicKey 使用者公钥，写入证书
+     * @return {@link X509Certificate}
+     * @since 1.0.0
+     */
+    public static X509Certificate generateX509Certificate(final X500Name issuer, final X500Name subject,
+                                                          final BigInteger serialNumber, final Date notBefore,
+                                                          final Date notAfter, final PrivateKey issuerPrivateKey,
+                                                          final PublicKey subjectPublicKey) {
+        return generateX509Certificate(issuer, subject, serialNumber, notBefore, notAfter, issuerPrivateKey,
+                subjectPublicKey, SIGN_ALGORITHM_SHA256_WITH_RSA);
+    }
+
+    /**
+     * 生成X.509证书，可指定签名算法。 <br>
+     * 颁发者与使用者名称相同时生成自签证书（并标记为CA，可签发下级证书），否则为下级证书。
+     *
+     * @param issuer             颁发者名称
+     * @param subject            使用者名称
+     * @param serialNumber       证书序列号，可通过{@link #generateRandomSerialNumber()}生成
+     * @param notBefore          生效时间
+     * @param notAfter           失效时间
+     * @param issuerPrivateKey   颁发者私钥，用于签名
+     * @param subjectPublicKey   使用者公钥，写入证书
+     * @param signatureAlgorithm 签名算法，如SHA256withRSA、SM3withSM2
+     * @return {@link X509Certificate}
+     * @since 1.0.0
+     */
+    public static X509Certificate generateX509Certificate(final X500Name issuer, final X500Name subject,
+                                                          final BigInteger serialNumber, final Date notBefore,
+                                                          final Date notAfter, final PrivateKey issuerPrivateKey,
+                                                          final PublicKey subjectPublicKey,
+                                                          final String signatureAlgorithm) {
+        final X509v3CertificateBuilder certBuilder = new X509v3CertificateBuilder(issuer, serialNumber, notBefore,
+                notAfter, subject, SubjectPublicKeyInfo.getInstance(subjectPublicKey.getEncoded()));
+        try {
+            if (issuer.equals(subject)) {
+                // 自签证书视为CA，允许签发下级证书
+                certBuilder.addExtension(Extension.basicConstraints, false, new BasicConstraints(1));
+            }
+            final ContentSigner signer = new JcaContentSignerBuilder(signatureAlgorithm).build(issuerPrivateKey);
+            final byte[] certBytes = certBuilder.build(signer).getEncoded();
+            return (X509Certificate) getCertificateFactory(CERT_TYPE_X509)
+                    .generateCertificate(new ByteArrayInputStream(certBytes));
+        } catch (CertificateException | IOException | OperatorCreationException e) {
+            throw new CryptoException(e);
+        }
+    }
+
+    /**
+     * 生成PKCS#10证书签名请求（CSR），用于向CA申请证书。
+     *
+     * @param subject            使用者名称
+     * @param publicKey          公钥，写入请求
+     * @param privateKey         私钥，用于签名
+     * @param signatureAlgorithm 签名算法，如SHA256withRSA、SM3withSM2
+     * @return {@link PKCS10CertificationRequest}，DER编码可通过{@code getEncoded()}获取
+     * @since 1.0.0
+     */
+    public static PKCS10CertificationRequest generateCsr(final X500Name subject, final PublicKey publicKey,
+                                                         final PrivateKey privateKey,
+                                                         final String signatureAlgorithm) {
+        final JcaPKCS10CertificationRequestBuilder builder = new JcaPKCS10CertificationRequestBuilder(subject,
+                publicKey);
+        try {
+            return builder.build(new JcaContentSignerBuilder(signatureAlgorithm).build(privateKey));
+        } catch (OperatorCreationException e) {
+            throw new CryptoException(e);
+        }
+    }
+
+    /**
+     * 写出PKCS#12（pfx/p12）密钥库文件，内容为证书及其对应私钥。 <br>
+     * 与{@link #readPKCS12KeyStore(File, char[])}互为读写。
+     *
+     * @param dest        目标文件
+     * @param certificate 证书
+     * @param privateKey  私钥
+     * @param alias       别名，读取时需使用同一别名
+     * @param password    密钥库密码
+     * @since 1.0.0
+     */
+    public static void writePKCS12KeyStore(final File dest, final Certificate certificate, final PrivateKey privateKey,
+                                           final String alias, final char[] password) {
+        try (OutputStream out = FileUtil.getOutputStream(dest)) {
+            writePKCS12KeyStore(out, certificate, privateKey, alias, password);
+        } catch (IOException e) {
+            throw new CryptoException(e);
+        }
+    }
+
+    /**
+     * 写出PKCS#12（pfx/p12）密钥库，内容为证书及其对应私钥。
+     *
+     * @param out         输出流
+     * @param certificate 证书
+     * @param privateKey  私钥
+     * @param alias       别名，读取时需使用同一别名
+     * @param password    密钥库密码
+     * @since 1.0.0
+     */
+    public static void writePKCS12KeyStore(final OutputStream out, final Certificate certificate,
+                                           final PrivateKey privateKey, final String alias, final char[] password) {
+        try {
+            final KeyStore keyStore = KeyStore.getInstance(KEY_TYPE_PKCS12);
+            keyStore.load(null, null);
+            keyStore.setKeyEntry(alias, privateKey, password, new Certificate[]{certificate});
+            keyStore.store(out, password);
+        } catch (KeyStoreException | CertificateException | NoSuchAlgorithmException | IOException e) {
+            throw new CryptoException(e);
+        }
+    }
+
+    /**
+     * 向X500Name构建器添加一个RDN。
+     *
+     * @param builder {@link X500NameBuilder}
+     * @param oid     RDN的OID
+     * @param value   值，为空白时跳过
+     */
+    private static void addRdn(final X500NameBuilder builder, final ASN1ObjectIdentifier oid, final String value) {
+        if (false == StrUtil.isBlank(value)) {
+            builder.addRDN(oid, value);
+        }
     }
 }

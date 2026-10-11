@@ -25,13 +25,17 @@ import cc.hongz.ztools.crypto.symmetric.RC4;
 import cc.hongz.ztools.crypto.symmetric.SymmetricCrypto;
 import cc.hongz.ztools.crypto.symmetric.ZUC;
 import cc.hongz.ztools.crypto.symmetric.fpe.FPE;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.crypto.AlphabetMapper;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import java.io.File;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.MessageDigest;
@@ -42,8 +46,10 @@ import java.security.PublicKey;
 import java.security.Security;
 import java.security.Signature;
 import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.KeySpec;
+import java.util.Date;
 import java.util.Map;
 
 /**
@@ -405,6 +411,143 @@ public final class SecureUtil {
      */
     public static Certificate readCertificate(final String type, final InputStream in) {
         return KeyUtil.readCertificate(type, in);
+    }
+
+    /**
+     * 生成X500Name，用于证书的颁发者与使用者名称，详见{@link KeyUtil#generateX500Name}。
+     *
+     * @param cn 通用名（Common Name），如域名或人名
+     * @param o  组织名（Organization）
+     * @param ou 组织单位（Organizational Unit）
+     * @param l  城市或地区（Locality）
+     * @param st 省或州（State）
+     * @param c  国家代码（Country），如CN
+     * @return {@link X500Name}
+     * @since 1.0.0
+     */
+    public static X500Name generateX500Name(final String cn, final String o, final String ou, final String l,
+                                            final String st, final String c) {
+        return KeyUtil.generateX500Name(cn, o, ou, l, st, c);
+    }
+
+    /**
+     * 生成随机的证书序列号，详见{@link KeyUtil#generateRandomSerialNumber}。
+     *
+     * @return 随机正整数序列号
+     * @since 1.0.0
+     */
+    public static BigInteger generateRandomSerialNumber() {
+        return KeyUtil.generateRandomSerialNumber();
+    }
+
+    /**
+     * 生成自签X.509证书，详见{@link KeyUtil#generateSelfSignedX509Certificate}。
+     *
+     * @param subject      使用者名称，同时作为颁发者名称
+     * @param privateKey   私钥，用于签名
+     * @param publicKey    公钥，写入证书
+     * @param serialNumber 证书序列号
+     * @param notBefore    生效时间
+     * @param notAfter     失效时间
+     * @return {@link X509Certificate}
+     * @since 1.0.0
+     */
+    public static X509Certificate generateSelfSignedX509Certificate(final X500Name subject, final PrivateKey privateKey,
+                                                                    final PublicKey publicKey,
+                                                                    final BigInteger serialNumber,
+                                                                    final Date notBefore, final Date notAfter) {
+        return KeyUtil.generateSelfSignedX509Certificate(subject, privateKey, publicKey, serialNumber, notBefore,
+                notAfter);
+    }
+
+    /**
+     * 生成X.509证书，使用默认签名算法，详见{@link KeyUtil#generateX509Certificate}。
+     *
+     * @param issuer           颁发者名称
+     * @param subject          使用者名称
+     * @param serialNumber     证书序列号
+     * @param notBefore        生效时间
+     * @param notAfter         失效时间
+     * @param issuerPrivateKey 颁发者私钥，用于签名
+     * @param subjectPublicKey 使用者公钥，写入证书
+     * @return {@link X509Certificate}
+     * @since 1.0.0
+     */
+    public static X509Certificate generateX509Certificate(final X500Name issuer, final X500Name subject,
+                                                          final BigInteger serialNumber, final Date notBefore,
+                                                          final Date notAfter, final PrivateKey issuerPrivateKey,
+                                                          final PublicKey subjectPublicKey) {
+        return KeyUtil.generateX509Certificate(issuer, subject, serialNumber, notBefore, notAfter, issuerPrivateKey,
+                subjectPublicKey);
+    }
+
+    /**
+     * 生成X.509证书，可指定签名算法，详见{@link KeyUtil#generateX509Certificate}。
+     *
+     * @param issuer             颁发者名称
+     * @param subject            使用者名称
+     * @param serialNumber       证书序列号
+     * @param notBefore          生效时间
+     * @param notAfter           失效时间
+     * @param issuerPrivateKey   颁发者私钥，用于签名
+     * @param subjectPublicKey   使用者公钥，写入证书
+     * @param signatureAlgorithm 签名算法，如SHA256withRSA、SM3withSM2
+     * @return {@link X509Certificate}
+     * @since 1.0.0
+     */
+    public static X509Certificate generateX509Certificate(final X500Name issuer, final X500Name subject,
+                                                          final BigInteger serialNumber, final Date notBefore,
+                                                          final Date notAfter, final PrivateKey issuerPrivateKey,
+                                                          final PublicKey subjectPublicKey,
+                                                          final String signatureAlgorithm) {
+        return KeyUtil.generateX509Certificate(issuer, subject, serialNumber, notBefore, notAfter, issuerPrivateKey,
+                subjectPublicKey, signatureAlgorithm);
+    }
+
+    /**
+     * 生成PKCS#10证书签名请求（CSR），详见{@link KeyUtil#generateCsr}。
+     *
+     * @param subject            使用者名称
+     * @param publicKey          公钥，写入请求
+     * @param privateKey         私钥，用于签名
+     * @param signatureAlgorithm 签名算法，如SHA256withRSA、SM3withSM2
+     * @return {@link PKCS10CertificationRequest}
+     * @since 1.0.0
+     */
+    public static PKCS10CertificationRequest generateCsr(final X500Name subject, final PublicKey publicKey,
+                                                         final PrivateKey privateKey,
+                                                         final String signatureAlgorithm) {
+        return KeyUtil.generateCsr(subject, publicKey, privateKey, signatureAlgorithm);
+    }
+
+    /**
+     * 写出PKCS#12（pfx/p12）密钥库文件，详见{@link KeyUtil#writePKCS12KeyStore}。
+     *
+     * @param dest        目标文件
+     * @param certificate 证书
+     * @param privateKey  私钥
+     * @param alias       别名，读取时需使用同一别名
+     * @param password    密钥库密码
+     * @since 1.0.0
+     */
+    public static void writePKCS12KeyStore(final File dest, final Certificate certificate, final PrivateKey privateKey,
+                                           final String alias, final char[] password) {
+        KeyUtil.writePKCS12KeyStore(dest, certificate, privateKey, alias, password);
+    }
+
+    /**
+     * 写出PKCS#12（pfx/p12）密钥库，详见{@link KeyUtil#writePKCS12KeyStore}。
+     *
+     * @param out         输出流
+     * @param certificate 证书
+     * @param privateKey  私钥
+     * @param alias       别名，读取时需使用同一别名
+     * @param password    密钥库密码
+     * @since 1.0.0
+     */
+    public static void writePKCS12KeyStore(final OutputStream out, final Certificate certificate,
+                                           final PrivateKey privateKey, final String alias, final char[] password) {
+        KeyUtil.writePKCS12KeyStore(out, certificate, privateKey, alias, password);
     }
 
     /**
